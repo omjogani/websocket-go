@@ -2,36 +2,49 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"net/http"
 
-	"github.com/gorilla/websocket"
+	"golang.org/x/net/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+type Server struct {
+	conns map[*websocket.Conn]bool
 }
 
-func websocketHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
+func NewServer() *Server {
+	return &Server{
+		conns: make(map[*websocket.Conn]bool),
 	}
+}
+
+func (s *Server) handleWS(ws *websocket.Conn) {
+	fmt.Println("New incoming Connection From Client: ", ws.RemoteAddr())
+	// maps are not concurrent(thread) safe so mutex can be used for production
+	s.conns[ws] = true
+	s.readLoop(ws)
+}
+
+func (s *Server) readLoop(ws *websocket.Conn) {
+	buf := make([]byte, 1024)
 	for {
-		messageType, p, err := conn.ReadMessage()
+		n, err := ws.Read(buf)
 		if err != nil {
-			log.Println(err)
-			return
+			if err == io.EOF {
+				// Connection from other side is closed!
+				break
+			}
+			fmt.Println("Read Error: ", err)
+			continue
 		}
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
-		}
+		msg := buf[:n]
+		fmt.Println("Message:", string(msg))
+		ws.Write([]byte("Thank you for the Message!!"))
 	}
 }
 
 func main() {
-	fmt.Print("Hello World")
+	server := NewServer()
+	http.Handle("/ws", websocket.Handler(server.handleWS))
+	http.ListenAndServe(":3550", nil)
 }
