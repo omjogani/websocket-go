@@ -1,4 +1,4 @@
-const wsURI = "ws://192.168.1.101:3550/stock";
+const wsURI = "ws://localhost:3550/stock";
 const wsList = [];
 const stockPriceDisplay = document.getElementById("stock-price");
 const table = document.getElementById("stock-table");
