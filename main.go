@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -19,13 +22,28 @@ func NewServer() *Server {
 	}
 }
 
-func (s *Server) handleWSOrderbook(ws *websocket.Conn) {
-	fmt.Println("New Incoming Connection from client to OrderBook Feed:", ws.RemoteAddr())
+func (s *Server) handleWSStock(ws *websocket.Conn) {
+	fmt.Println("New Incoming Connection from client to Stock Feed:", ws.RemoteAddr())
+	price := strings.Split(ws.Request().URL.RawQuery, "=")[1]
 
-	for {
-		payload := fmt.Sprintf("OrderData -> %d\n", time.Now().UnixNano())
+	if price == "" {
+		payload := "N/A"
 		ws.Write([]byte(payload))
-		time.Sleep(time.Second * 2)
+	} else {
+		for {
+			parsedPrice, err := strconv.Atoi(price)
+			if err != nil {
+				fmt.Println("Error: Parsing Price error")
+			}
+
+			min := parsedPrice - 5
+			max := parsedPrice + 5
+			randomNumber := rand.Intn(max-min+1)%(max-min+1) + min
+
+			payload := strconv.Itoa(randomNumber)
+			ws.Write([]byte(payload))
+			time.Sleep(time.Second * 1)
+		}
 	}
 }
 
@@ -68,6 +86,6 @@ func (s *Server) broadcast(b []byte) {
 func main() {
 	server := NewServer()
 	http.Handle("/ws", websocket.Handler(server.handleWS))
-	http.Handle("/orderbookfeed", websocket.Handler(server.handleWSOrderbook))
+	http.Handle("/stock", websocket.Handler(server.handleWSStock))
 	http.ListenAndServe(":3550", nil)
 }
